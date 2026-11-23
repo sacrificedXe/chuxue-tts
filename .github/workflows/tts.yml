@@ -22,11 +22,14 @@ jobs:
       - name: Install deps (CPU)
         run: |
           python -m pip install -U pip
-          pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
           pip install "transformers>=4.51,<5" librosa==0.10.2 numba cn2an pypinyin \
             jieba_fast ffmpeg-python pytorch-lightning "torchmetrics<=1.5" peft \
             x_transformers rotary_embedding_torch fast_langdetect split-lang \
             wordsegment soundfile torchcodec accelerate psutil
+          # 最后再装一次 CPU 版，避免被上面任何包替换成 CUDA 版本
+          pip uninstall -y torch torchaudio torchvision || true
+          pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -c "import torch, torchaudio; print('torch', torch.__version__); print('torchaudio', torchaudio.__version__); x=torch.randn(1,16000); print('resample', torchaudio.transforms.Resample(16000,32000)(x).shape)"
 
       - name: Get GPT-SoVITS + base models
         run: |
