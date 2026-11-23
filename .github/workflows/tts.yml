@@ -25,7 +25,7 @@ jobs:
           pip install "transformers>=4.51,<5" librosa==0.10.2 numba cn2an pypinyin \
             jieba_fast ffmpeg-python pytorch-lightning "torchmetrics<=1.5" peft \
             x_transformers rotary_embedding_torch fast_langdetect split-lang \
-            wordsegment soundfile torchcodec accelerate psutil
+            wordsegment soundfile torchcodec accelerate psutil matplotlib
           # 最后再装一次 CPU 版，避免被上面任何包替换成 CUDA 版本
           pip uninstall -y torch torchaudio torchvision || true
           pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
