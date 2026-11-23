@@ -1,0 +1,58 @@
+name: chuxue-tts
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: '要合成的文本'
+        required: false
+        default: '博士，今天也没有飞行实验的排期。'
+
+jobs:
+  tts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install deps (CPU)
+        run: |
+          python -m pip install -U pip
+          pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install "transformers>=4.51,<5" librosa==0.10.2 numba cn2an pypinyin \
+            jieba_fast ffmpeg-python pytorch-lightning "torchmetrics<=1.5" peft \
+            x_transformers rotary_embedding_torch fast_langdetect split-lang \
+            wordsegment soundfile torchcodec accelerate psutil
+
+      - name: Get GPT-SoVITS + base models
+        run: |
+          git clone --depth 1 https://github.com/RVC-Boss/GPT-SoVITS.git gsv
+          cd gsv/GPT_SoVITS/pretrained_models
+          mkdir -p chinese-hubert-base chinese-roberta-base gsv-v4-pretrained
+          curl -sL -o gsv-v4-pretrained/s2Gv4.pth  https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/gsv-v4-pretrained/s2Gv4.pth
+          curl -sL -o gsv-v4-pretrained/vocoder.pth https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/gsv-v4-pretrained/vocoder.pth
+          curl -sL -o chinese-hubert-base/pytorch_model.bin https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/chinese-hubert-base/pytorch_model.bin
+          curl -sL -o chinese-hubert-base/config.json        https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/chinese-hubert-base/config.json
+          curl -sL -o chinese-roberta-base/pytorch_model.bin https://huggingface.co/hfl/chinese-roberta-wwm-ext/resolve/main/pytorch_model.bin
+          curl -sL -o chinese-roberta-base/config.json        https://huggingface.co/hfl/chinese-roberta-wwm-ext/resolve/main/config.json
+          ls -lh gsv-v4-pretrained chinese-hubert-base chinese-roberta-base
+
+      - name: Get Chuxue model
+        run: |
+          curl -sL -o cx.zip "https://www.modelscope.cn/models/aihobbyist/GPT-SoVITS_Model_Collection/resolve/master/%E6%98%8E%E6%97%A5%E6%96%B9%E8%88%9F/%E4%B8%AD%E6%96%87/%E5%88%9D%E9%9B%AA.zip"
+          unzip -o cx.zip -d cx
+          find cx -maxdepth 3 -type f | head -20
+
+      - name: Synthesize
+        env:
+          TARGET_TEXT: ${{ github.event.inputs.text }}
+        run: python tts_run.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chuxue-audio
+          path: out.wav
