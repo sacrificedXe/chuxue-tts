@@ -14,24 +14,27 @@ torch.set_num_threads(4)
 
 from GPT_SoVITS.TTS_infer_pack.TTS import TTS, TTS_Config
 
-# 初雪模型包解压后的路径
-ckpt = glob.glob(os.path.join(os.path.dirname(ROOT), 'cx', '**', '*.ckpt'), recursive=True)[0]
-pth = glob.glob(os.path.join(os.path.dirname(ROOT), 'cx', '**', '*.pth'), recursive=True)[0]
-ref = glob.glob(os.path.join(os.path.dirname(ROOT), 'cx', '**', '*reference_audios*', '**', '*.wav'), recursive=True)[0]
-print('ckpt:', ckpt)
-print('pth :', pth)
-print('ref :', ref)
+here = os.path.dirname(os.path.abspath(__file__))
+ckpt = glob.glob(os.path.join(here, 'cx', '**', '*.ckpt'), recursive=True)[0]
+pth = glob.glob(os.path.join(here, 'cx', '**', '*.pth'), recursive=True)[0]
+ref = glob.glob(os.path.join(here, 'cx', '**', '*reference_audios*', '**', '*.wav'), recursive=True)[0]
+print('ckpt:', ckpt, flush=True)
+print('pth :', pth, flush=True)
+print('ref :', ref, flush=True)
 
 cfg = TTS_Config('GPT_SoVITS/configs/tts_infer.yaml')
+# 关键：构造 TTS 之前就把路径全部指好，否则它会去加载 yaml 里的 v2 默认底模
 cfg.device = 'cpu'
 cfg.is_half = False
 cfg.version = 'v4'
 cfg.bert_base_path = 'GPT_SoVITS/pretrained_models/chinese-roberta-base'
 cfg.cnhuhbert_base_path = 'GPT_SoVITS/pretrained_models/chinese-hubert-base'
+cfg.t2s_weights_path = ckpt
+cfg.vits_weights_path = pth
+print('config ->', cfg.version, cfg.t2s_weights_path, cfg.vits_weights_path, flush=True)
 
 tts = TTS(cfg)
-tts.init_t2s_weights(ckpt)
-tts.init_vits_weights(pth)
+print('models loaded', flush=True)
 
 text = os.environ.get('TARGET_TEXT') or '博士，今天也没有飞行实验的排期。'
 req = {
@@ -58,6 +61,6 @@ for sr, audio in tts.run(req):
     print('chunk %.2fs' % (len(audio) / sr), flush=True)
 
 sr, audio = last
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out.wav')
+out = os.path.join(here, 'out.wav')
 sf.write(out, audio, sr)
-print('saved %s  %.2fs @ %d Hz' % (out, len(audio) / sr, sr))
+print('saved %s  %.2fs @ %d Hz' % (out, len(audio) / sr, sr), flush=True)
