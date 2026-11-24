@@ -37,8 +37,6 @@ jobs:
           ls
 
       - name: Get model
-        env:
-          HF_ENDPOINT: https://hf-mirror.com
         run: |
           mkdir -p CosyVoice/pretrained_models
           python - <<'EOF'
