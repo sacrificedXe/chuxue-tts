@@ -26,7 +26,7 @@ jobs:
           pip install numpy==1.26.4 "transformers==4.51.3" conformer==0.3.2 \
             diffusers==0.29.0 HyperPyYAML==1.2.3 omegaconf==2.3.0 hydra-core==1.3.2 \
             librosa==0.10.2 soundfile onnxruntime==1.18.0 \
-            WeTextProcessing inflect==7.3.1 networkx==3.1 rich pyarrow modelscope
+            WeTextProcessing inflect==7.3.1 networkx==3.1 rich pyarrow modelscope openai-whisper==20231117 tiktoken gdown
           python -c "import torch, torchaudio, onnxruntime; print(torch.__version__, torchaudio.__version__, onnxruntime.__version__)"
 
       - name: Get CosyVoice code
