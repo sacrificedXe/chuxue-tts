@@ -27,7 +27,7 @@ jobs:
             x_transformers rotary_embedding_torch fast_langdetect split-lang \
             wordsegment soundfile torchcodec accelerate psutil matplotlib \
             jieba sentencepiece chardet PyYAML ToJyutping g2pk2 ko_pron opencc ctranslate2 av \
-            protobuf resampy
+            protobuf resampy onnxruntime
           # 最后再装一次 CPU 版，避免被上面任何包替换成 CUDA 版本
           pip uninstall -y torch torchaudio torchvision || true
           pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
