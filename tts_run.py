@@ -39,10 +39,10 @@ print('models loaded', flush=True)
 text = os.environ.get('TARGET_TEXT') or '博士，今天也没有飞行实验的排期。'
 req = {
     'text': text,
-    'text_lang': '中文',
+    'text_lang': 'zh',
     'ref_audio_path': ref,
     'prompt_text': '啊，我是现任剩女，没错。',
-    'prompt_lang': '中文',
+    'prompt_lang': 'zh',
     'top_k': 5,
     'top_p': 1.0,
     'temperature': 1.0,
