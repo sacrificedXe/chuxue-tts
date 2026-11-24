@@ -1,0 +1,53 @@
+name: f5-chuxue-tts
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: '要合成的文本'
+        required: false
+        default: '博士，今天也没有飞行实验的排期。'
+
+jobs:
+  tts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install f5-tts soundfile
+
+      - name: Get reference audio
+        run: |
+          mkdir -p ref
+          curl -sL -o cx.zip "https://www.modelscope.cn/models/aihobbyist/GPT-SoVITS_Model_Collection/resolve/master/%E6%98%8E%E6%97%A5%E6%96%B9%E8%88%9F/%E4%B8%AD%E6%96%87/%E5%88%9D%E9%9B%AA.zip"
+          unzip -o cx.zip -d cx
+          find cx -name "*.wav" -exec cp {} ref/ref.wav \;
+          ls -lh ref/
+
+      - name: Synthesize
+        env:
+          TARGET_TEXT: ${{ github.event.inputs.text }}
+        run: |
+          f5-tts_infer-cli \
+            --model F5TTS_v1_Base \
+            --ref_audio ref/ref.wav \
+            --ref_text "啊，我是现任剩女，没错。" \
+            --gen_text "$TARGET_TEXT" \
+            --output_file out.wav \
+            --device cpu
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: f5-audio
+          path: out.wav
+          if-no-files-found: warn
