@@ -1,0 +1,68 @@
+name: poem-asmr
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: '用 | 分隔每一句'
+        required: false
+        default: '假如我是一朵雪花|翩翩的在半空里潇洒|我一定认清我的方向|飞扬，飞扬，飞扬|这地面上有我的方向'
+
+jobs:
+  tts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install "setuptools<80" scipy
+          pip install "transformers>=4.51,<5" librosa==0.10.2 numba cn2an pypinyin \
+            jieba jieba_fast ffmpeg-python pytorch-lightning "torchmetrics<=1.5" peft \
+            x_transformers rotary_embedding_torch fast_langdetect split-lang \
+            wordsegment soundfile torchcodec accelerate psutil matplotlib \
+            sentencepiece chardet PyYAML ToJyutping g2pk2 ko_pron opencc ctranslate2 av \
+            protobuf resampy onnxruntime
+          pip uninstall -y torch torchaudio torchvision || true
+          pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -c "import torch, torchaudio; print(torch.__version__, torchaudio.__version__)"
+
+      - name: Get GPT-SoVITS + models
+        run: |
+          git clone --depth 1 https://github.com/RVC-Boss/GPT-SoVITS.git gsv
+          cd gsv/GPT_SoVITS/pretrained_models
+          mkdir -p chinese-hubert-base chinese-roberta-wwm-ext-large gsv-v4-pretrained fast_langdetect
+          curl -sL -o gsv-v4-pretrained/s2Gv4.pth  https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/gsv-v4-pretrained/s2Gv4.pth
+          curl -sL -o gsv-v4-pretrained/vocoder.pth https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/gsv-v4-pretrained/vocoder.pth
+          curl -sL -o chinese-hubert-base/pytorch_model.bin https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/chinese-hubert-base/pytorch_model.bin
+          curl -sL -o chinese-hubert-base/config.json https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/chinese-hubert-base/config.json
+          curl -sL -o chinese-hubert-base/preprocessor_config.json https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/chinese-hubert-base/preprocessor_config.json
+          curl -sL -o chinese-roberta-wwm-ext-large/pytorch_model.bin https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/chinese-roberta-wwm-ext-large/pytorch_model.bin
+          curl -sL -o chinese-roberta-wwm-ext-large/config.json https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/chinese-roberta-wwm-ext-large/config.json
+          curl -sL -o chinese-roberta-wwm-ext-large/tokenizer.json https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/chinese-roberta-wwm-ext-large/tokenizer.json
+          curl -sL -o chinese-roberta-wwm-ext-large/vocab.txt https://huggingface.co/hfl/chinese-roberta-wwm-ext-large/resolve/main/vocab.txt
+          ls -lh gsv-v4-pretrained chinese-hubert-base chinese-roberta-wwm-ext-large
+
+      - name: Get Chuxue model
+        run: |
+          curl -sL -o cx.zip "https://www.modelscope.cn/models/aihobbyist/GPT-SoVITS_Model_Collection/resolve/master/%E6%98%8E%E6%97%A5%E6%96%B9%E8%88%9F/%E4%B8%AD%E6%96%87/%E5%88%9D%E9%9B%AA.zip"
+          unzip -o cx.zip -d cx
+          find cx -maxdepth 3 -type f | head
+
+      - name: Synthesize poem
+        env:
+          TARGET_TEXT: ${{ github.event.inputs.text }}
+        run: python poem_run.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: poem-audio
+          path: out.wav
+          if-no-files-found: warn
