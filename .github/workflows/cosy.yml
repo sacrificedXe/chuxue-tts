@@ -1,0 +1,94 @@
+name: cosyvoice-tts
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: '要合成的文本'
+        required: false
+        default: '今天的云很薄，适合飞行。博士，要一起吗？'
+
+jobs:
+  tts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install deps (CPU, minimal)
+        run: |
+          python -m pip install -U pip
+          pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy==1.26.4 "transformers==4.51.3" conformer==0.3.2 \
+            diffusers==0.29.0 HyperPyYAML==1.2.3 omegaconf==2.3.0 hydra-core==1.3.2 \
+            librosa==0.10.2 soundfile onnxruntime==1.18.0 \
+            WeTextProcessing inflect==7.3.1 networkx==3.1 rich pyarrow
+          python -c "import torch, torchaudio, onnxruntime; print(torch.__version__, torchaudio.__version__, onnxruntime.__version__)"
+
+      - name: Get CosyVoice code
+        run: |
+          git clone --depth 1 https://github.com/FunAudioLLM/CosyVoice.git
+          cd CosyVoice
+          git submodule update --init --recursive || true
+          ls
+
+      - name: Get model
+        env:
+          HF_ENDPOINT: https://hf-mirror.com
+        run: |
+          mkdir -p CosyVoice/pretrained_models
+          python - <<'EOF'
+          from huggingface_hub import snapshot_download
+          p = snapshot_download('FunAudioLLM/CosyVoice2-0.5B',
+                                local_dir='CosyVoice/pretrained_models/CosyVoice2-0.5B')
+          print('downloaded to', p)
+          EOF
+
+      - name: Get reference audio
+        run: |
+          mkdir -p ref
+          curl -sL -o cx.zip "https://www.modelscope.cn/models/aihobbyist/GPT-SoVITS_Model_Collection/resolve/master/%E6%98%8E%E6%97%A5%E6%96%B9%E8%88%9F/%E4%B8%AD%E6%96%87/%E5%88%9D%E9%9B%AA.zip"
+          unzip -o cx.zip -d cx
+          find cx -name "*.wav" -exec cp {} ref/ref.wav \;
+          ls -lh ref/
+
+      - name: Synthesize
+        env:
+          TARGET_TEXT: ${{ github.event.inputs.text }}
+        run: |
+          cd CosyVoice
+          python - <<'EOF'
+          import os, sys
+          sys.path.insert(0, '.')
+          sys.path.insert(0, 'third_party/Matcha-TTS')
+          import torch, torchaudio
+          from cosyvoice.cli.cosyvoice import CosyVoice2
+          from cosyvoice.utils.file_utils import load_wav
+
+          torch.set_num_threads(4)
+          m = CosyVoice2('pretrained_models/CosyVoice2-0.5B', load_jit=False, load_trt=False, fp16=False)
+          print('model loaded', flush=True)
+
+          prompt = load_wav('../ref/ref.wav', 16000)
+          text = os.environ.get('TARGET_TEXT') or '博士，今天也没有飞行实验的排期。'
+          ref_text = '啊，我是现任剩女，没错。'
+
+          chunks = []
+          for i, out in enumerate(m.inference_zero_shot(text, ref_text, prompt, stream=False)):
+              chunks.append(out['tts_speech'])
+              print('chunk', i, out['tts_speech'].shape, flush=True)
+          audio = torch.cat(chunks, dim=1)
+          torchaudio.save('../out.wav', audio, m.sample_rate)
+          print('saved ../out.wav', audio.shape, m.sample_rate, flush=True)
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cosy-audio
+          path: out.wav
+          if-no-files-found: warn
