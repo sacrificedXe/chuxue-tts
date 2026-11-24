@@ -45,6 +45,13 @@ jobs:
             --output_file out.wav \
             --device cpu
 
+      - name: Collect output
+        if: always()
+        run: |
+          ls -lh tests/ 2>/dev/null || true
+          cp -v tests/out.wav ./out.wav 2>/dev/null || find . -name "*.wav" -newer /tmp -exec cp {} ./out.wav \; || true
+          ls -lh out.wav 2>/dev/null || true
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
