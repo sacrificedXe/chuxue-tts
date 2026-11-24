@@ -37,7 +37,7 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/RVC-Boss/GPT-SoVITS.git gsv
           cd gsv/GPT_SoVITS/pretrained_models
-          mkdir -p chinese-hubert-base chinese-roberta-base gsv-v4-pretrained
+          mkdir -p chinese-hubert-base chinese-roberta-base gsv-v4-pretrained fast_langdetect
           curl -sL -o gsv-v4-pretrained/s2Gv4.pth  https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/gsv-v4-pretrained/s2Gv4.pth
           curl -sL -o gsv-v4-pretrained/vocoder.pth https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/gsv-v4-pretrained/vocoder.pth
           curl -sL -o chinese-hubert-base/pytorch_model.bin https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/chinese-hubert-base/pytorch_model.bin
