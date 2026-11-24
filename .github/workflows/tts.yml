@@ -44,6 +44,7 @@ jobs:
           curl -sL -o chinese-hubert-base/config.json        https://huggingface.co/lj1995/GPT-SoVITS/resolve/main/chinese-hubert-base/config.json
           curl -sL -o chinese-roberta-base/pytorch_model.bin https://huggingface.co/hfl/chinese-roberta-wwm-ext/resolve/main/pytorch_model.bin
           curl -sL -o chinese-roberta-base/config.json        https://huggingface.co/hfl/chinese-roberta-wwm-ext/resolve/main/config.json
+          curl -sL -o chinese-roberta-base/vocab.txt          https://huggingface.co/hfl/chinese-roberta-wwm-ext/resolve/main/vocab.txt
           ls -lh gsv-v4-pretrained chinese-hubert-base chinese-roberta-base
 
       - name: Get Chuxue model
