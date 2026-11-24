@@ -89,7 +89,7 @@ for i, seg in enumerate(segments):
         'ref_audio_path': ref, 'prompt_text': prompt_text, 'prompt_lang': 'zh',
         'top_k': 8, 'top_p': 1.0, 'temperature': 1.0,
         'text_split_method': 'cut0',
-        'batch_size': 1, 'speed_factor': 0.75,
+        'batch_size': 1, 'speed_factor': 0.8,
         'repetition_penalty': 1.35, 'sample_steps': 16,
         'parallel_infer': True, 'streaming_mode': False,
     }
