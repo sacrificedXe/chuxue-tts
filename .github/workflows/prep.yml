@@ -1,0 +1,32 @@
+name: prep-dataset
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install
+        run: |
+          pip install -U pip
+          pip install numpy soundfile librosa faster-whisper
+
+      - name: Segment + label
+        env:
+          HF_ENDPOINT: https://hf-mirror.com
+        run: python prep_dataset_ci.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: yuji-dataset
+          path: dataset/
+          if-no-files-found: warn
