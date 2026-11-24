@@ -17,7 +17,10 @@ from GPT_SoVITS.TTS_infer_pack.TTS import TTS, TTS_Config
 here = os.path.dirname(os.path.abspath(__file__))
 ckpt = glob.glob(os.path.join(here, 'cx', '**', '*.ckpt'), recursive=True)[0]
 pth = glob.glob(os.path.join(here, 'cx', '**', '*.pth'), recursive=True)[0]
-ref = glob.glob(os.path.join(here, 'cx', '**', '*reference_audios*', '**', '*.wav'), recursive=True)[0]
+_soft = os.path.join(here, 'ref_soft.wav')
+ref = _soft if os.path.exists(_soft) else glob.glob(os.path.join(here, 'cx', '**', '*reference_audios*', '**', '*.wav'), recursive=True)[0]
+prompt_text = ('出来玩耍就要尽兴，别把那些条条框框套在我身上呀。' if os.path.exists(_soft)
+               else '啊，我是现任剩女，没错。')
 print('ckpt:', ckpt, flush=True)
 print('pth :', pth, flush=True)
 print('ref :', ref, flush=True)
@@ -41,14 +44,14 @@ req = {
     'text': text,
     'text_lang': 'zh',
     'ref_audio_path': ref,
-    'prompt_text': '啊，我是现任剩女，没错。',
+    'prompt_text': prompt_text,
     'prompt_lang': 'zh',
     'top_k': 5,
     'top_p': 1.0,
     'temperature': 1.0,
     'text_split_method': 'cut0',
     'batch_size': 1,
-    'speed_factor': 0.95,
+    'speed_factor': 0.85,
     'repetition_penalty': 1.35,
     'sample_steps': 16,
     'parallel_infer': True,
