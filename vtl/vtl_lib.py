@@ -5,8 +5,30 @@ import os
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LIB = os.environ.get('VTL_LIB', os.path.join(HERE, 'libVTL_anat.so'))
-SPK = os.environ.get('VTL_SPK', os.path.join(HERE, 'W02.speaker'))
+
+
+def _resolve():
+    """优先用仓库内自带的库和音色；没有则回落到 pip 包 vocaltractlab。"""
+    lib = os.environ.get('VTL_LIB')
+    spk = os.environ.get('VTL_SPK')
+    if not lib:
+        cand = os.path.join(HERE, 'libVTL_anat.so')
+        lib = cand if os.path.exists(cand) else None
+    if not spk:
+        cand = os.path.join(HERE, 'W02.speaker')
+        spk = cand if os.path.exists(cand) else None
+    if lib is None or spk is None:
+        try:
+            import vocaltractlab_cython as vc
+            base = os.path.dirname(vc.__file__)
+            lib = lib or os.path.join(base, 'libVocalTractLabApi.so')
+            spk = spk or os.path.join(base, 'resources', 'JD3.speaker')
+        except Exception as e:
+            raise RuntimeError('找不到 VTL 库/音色：%s' % e)
+    return lib, spk
+
+
+LIB, SPK = _resolve()
 SR = 48000
 BLOCK = 110                      # 一次 VTL 调用合成的采样数 ≈ 2.29 ms
 MODEL_HOP = 20                   # 模型帧 = 20 个 BLOCK ≈ 45.8 ms（≈22 fps）

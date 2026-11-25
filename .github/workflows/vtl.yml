@@ -24,8 +24,14 @@ jobs:
       - name: Install deps (CPU)
         run: |
           python -m pip install -q --upgrade pip
-          pip install -q numpy scipy soundfile
+          pip install -q numpy scipy soundfile vocaltractlab
           pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Unpack speaker (if shipped as .gz)
+        working-directory: vtl
+        run: |
+          if [ -f W02.speaker.gz ] && [ ! -f W02.speaker ]; then gunzip -kf W02.speaker.gz; fi
+          ls -la
 
       - name: Smoke test (2 samples)
         working-directory: vtl
