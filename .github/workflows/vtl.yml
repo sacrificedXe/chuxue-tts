@@ -1,0 +1,64 @@
+name: vtl-inverse
+on:
+  workflow_dispatch:
+    inputs:
+      n_samples:
+        description: '合成样本数'
+        default: '5000'
+      epochs:
+        description: '训练轮数'
+        default: '30'
+      max_sec:
+        description: '评估音频长度（秒）'
+        default: '60'
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps (CPU)
+        run: |
+          python -m pip install -q --upgrade pip
+          pip install -q numpy scipy soundfile
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Smoke test (2 samples)
+        working-directory: vtl
+        run: |
+          set -x
+          python -c "import torch,numpy,soundfile,scipy; print('torch',torch.__version__,'numpy',numpy.__version__)"
+          ldd libVTL_anat.so || true
+          python make_data.py --n 4 --out smoke --shard 4 --workers 2
+          python train.py --data smoke --epochs 1 --batch 2 --out smoke.pt
+          python infer.py --wav ../cvcn.wav --model smoke.pt --out smoke.wav --max-sec 5
+          ls -la
+
+      - name: Generate dataset
+        working-directory: vtl
+        run: python make_data.py --n ${{ inputs.n_samples }} --out data --shard 400 --workers 4
+
+      - name: Train inverse model
+        working-directory: vtl
+        run: python train.py --data data --epochs ${{ inputs.epochs }} --out model.pt
+
+      - name: Infer + evaluate (LTAS)
+        working-directory: vtl
+        run: python infer.py --wav ../cvcn.wav --model model.pt --out vtl_out.wav --max-sec ${{ inputs.max_sec }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vtl-result
+          path: |
+            vtl/model.pt
+            vtl/vtl_out.wav
+            vtl/infer_summary.json
+            vtl/train_summary.json
+            vtl/data/meta.json
+            vtl/smoke.wav
+            vtl/smoke/*.npz
