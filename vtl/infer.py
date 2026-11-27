@@ -20,7 +20,9 @@ from train import Net
 
 
 def norm_mel(m):
-    return m - m.mean(-1, keepdims=True)
+    """逐帧标准化（与 make_data.make_mel 一致）。"""
+    m = np.asarray(m, dtype=np.float32)
+    return np.clip((m - m.mean(-1, keepdims=True)) / (m.std(-1, keepdims=True) + 1e-6), -6, 6)
 
 
 def read_audio(path, max_sec=None):
@@ -121,6 +123,8 @@ def main():
     sp = 100 * params.std(0) / (V.HI - V.LO)
     out = dict(frames=T, ltas_model=round(d, 2), ltas_neutral=round(d0, 2),
                param_std_pct=[round(float(v), 1) for v in sp],
+               f0_median=round(float(np.median(f0)), 1),
+               voiced_pct=round(float(100 * voiced[:T].mean()), 1),
                param_mean=[round(float(v), 2) for v in params.mean(0)],
                param_train_mean_mae=ck.get('val_mae'),
                seconds=round(len(y) / V.SR, 1))

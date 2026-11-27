@@ -46,6 +46,17 @@ def load(data):
     return np.concatenate(mels), np.concatenate(pars), np.concatenate(f0s)
 
 
+def augment(xb):
+    """训练时加噪声与频谱倾斜，模拟真人录音的毛刺与染色，缩小域偏移。"""
+    b, t, d = xb.shape
+    noise = torch.randn_like(xb) * 0.12
+    ramp = torch.linspace(-1, 1, d)
+    tilt = (torch.rand(b, t, 1) * 0.25 - 0.125) * ramp
+    y = xb + noise + tilt
+    y = (y - y.mean(-1, keepdim=True)) / (y.std(-1, keepdim=True) + 1e-6)
+    return y.clamp(-6, 6)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default='data')
@@ -83,6 +94,8 @@ def main():
             if len(b) < 2:
                 continue
             xb, pb, fb = tm[b], tp[b], tf[b]
+            if train:
+                xb = augment(xb)
             pred = net(xb, fb)
             loss = nn.functional.mse_loss(pred, pb)
             # 时间平滑：参数轨迹二阶差分惩罚，抑制逐帧抖动

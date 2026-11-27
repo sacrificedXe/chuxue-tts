@@ -53,7 +53,11 @@ def make_mel(audio, sr=V.SR):
     S = np.abs(np.fft.rfft(frames, axis=1)) ** 2           # (n, 513)
     mel = S @ _BANK['fb'].T                                # (n, 80)
     mel = mel[:T * V.MODEL_HOP].reshape(T, V.MODEL_HOP, N_MELS).mean(1)   # (T, 80)
-    return np.log(mel + 1e-6)
+    mel = np.log(mel + 1e-6)
+    # 逐帧标准化：同步去掉音量与频谱对比度。真人录音与 VTL 合成在这两项上差 3 倍，
+    # 不归一化时网络会把真实频谱当成分布外输入，直接塌成常数输出。
+    mel = (mel - mel.mean(-1, keepdims=True)) / (mel.std(-1, keepdims=True) + 1e-6)
+    return np.clip(mel, -6, 6)
 
 
 _G = {}
@@ -72,7 +76,7 @@ def gen_one(seed):
     u = u0 * (1 - t) + u1 * t
     u += rng.normal(0, 0.012, (T, 4))
     u = np.clip(u, 0.0, 1.0)
-    f0b = rng.uniform(90, 260)
+    f0b = rng.uniform(85, 320)
     f0 = f0b * (1 + 0.04 * np.sin(np.linspace(0, rng.uniform(1, 4), T) + rng.uniform(0, 6)))
     f0 += rng.normal(0, 1.5, T)
     audio = _G['vtl'].synth(V.from_unit(u), f0)
