@@ -33,6 +33,8 @@ SR = 48000
 BLOCK = 110                      # 一次 VTL 调用合成的采样数 ≈ 2.29 ms
 MODEL_HOP = 20                   # 模型帧 = 20 个 BLOCK ≈ 45.8 ms（≈22 fps）
 
+GLOTTIS_DEFAULT = np.array([120.0, 8000.0, 0.02, 0.02, 0.03, 1.22, 1.0, 0.0, 25.0])
+
 PARAM_NAMES = ['HX', 'HY', 'JX', 'JA', 'LP', 'LD', 'VS', 'VO',
                'TCX', 'TCY', 'TTX', 'TTY', 'TBX', 'TBY', 'TRX', 'TRY',
                'TS1', 'TS2', 'TS3']
@@ -41,7 +43,8 @@ BASE = np.array([0.17, -3.94, 0.0, -4.15, 0.07, 0.99, 0.8, -0.1,
                  0.15, -1.83, 4.25, -1.69, 2.55, -0.68, -2.84, -2.9,
                  0.21, 0.04, 0.15])
 FREE = ['TCX', 'TCY', 'JA', 'LD']
-RANGE = {'TCX': (-3.0, 4.0), 'TCY': (-3.0, 1.0), 'JA': (-7.0, 0.0), 'LD': (-2.0, 2.0)}
+# 实测可发声域（超出即闭管静音）：LD≤0 闭唇、TCY≥-0.6 舌顶腭、TCX≥2.6 或 ≤-1.6 闭管
+RANGE = {'TCX': (-0.6, 2.4), 'TCY': (-3.0, -0.9), 'JA': (-6.5, -0.5), 'LD': (0.3, 1.8)}
 NEUTRAL = np.array([0.15, -1.83, -4.15, 0.99])
 LO = np.array([RANGE[n][0] for n in FREE])
 HI = np.array([RANGE[n][1] for n in FREE])
@@ -75,14 +78,15 @@ class VTL:
         self.tract_dim = nt.value
         self.glottis_dim = ng.value
         self.buf = np.zeros(4000)
+        self.tract_buf = BASE.copy()   # 必须复用同一块内存：VTL 会保留上一次的形状指针做插值
         self.gl = np.zeros(ng.value)
-        self.gl[1] = 8000.0
-        self.gl[4] = 0.03
+        self.gl[:] = GLOTTIS_DEFAULT
         self.reset()
 
     def reset(self):
+        self.tract_buf[:] = BASE
         self.lib.vtlResetTractSynthesis()
-        self.lib.vtlSynthesisAddTract(0, self.buf, self.tract(), self.gl)   # 首帧只用于初始化
+        self.lib.vtlSynthesisAddTract(0, self.buf, self.tract_buf, self.gl)   # 首帧只用于初始化
 
     def tract(self, p=None):
         t = BASE.copy()
@@ -106,10 +110,12 @@ class VTL:
         self.reset()
         chunks = []
         for i in range(n):
-            tract = self.tract(p_block[i])
+            self.tract_buf[:] = BASE
+            for name, v in zip(FREE, p_block[i]):
+                self.tract_buf[IDX[name]] = float(v)
             self.gl[0] = float(f_block[i])
             self.buf[:] = 0
-            self.lib.vtlSynthesisAddTract(BLOCK, self.buf, tract, self.gl)
+            self.lib.vtlSynthesisAddTract(BLOCK, self.buf, self.tract_buf, self.gl)
             chunks.append(self.buf[:BLOCK].copy())
         return np.concatenate(chunks)
 

@@ -15,12 +15,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+import feats
+
 
 class Net(nn.Module):
-    def __init__(self, n_mels=80, hid=128):
+    def __init__(self, n_in=feats.N_FEAT + 1, hid=128):
         super().__init__()
         self.enc = nn.Sequential(
-            nn.Conv1d(n_mels + 1, hid, 5, padding=2), nn.BatchNorm1d(hid), nn.ReLU(),
+            nn.Conv1d(n_in, hid, 5, padding=2), nn.BatchNorm1d(hid), nn.ReLU(),
             nn.Conv1d(hid, hid, 5, padding=4, dilation=2), nn.BatchNorm1d(hid), nn.ReLU(),
             nn.Conv1d(hid, hid, 5, padding=8, dilation=4), nn.BatchNorm1d(hid), nn.ReLU(),
         )
@@ -47,14 +49,10 @@ def load(data):
 
 
 def augment(xb):
-    """训练时加噪声与频谱倾斜，模拟真人录音的毛刺与染色，缩小域偏移。"""
-    b, t, d = xb.shape
-    noise = torch.randn_like(xb) * 0.12
-    ramp = torch.linspace(-1, 1, d)
-    tilt = (torch.rand(b, t, 1) * 0.25 - 0.125) * ramp
-    y = xb + noise + tilt
-    y = (y - y.mean(-1, keepdim=True)) / (y.std(-1, keepdim=True) + 1e-6)
-    return y.clamp(-6, 6)
+    """只扰动 0:80（形状）与 80:160（差分），保留第 161 维对比度不动。"""
+    y = xb.clone()
+    y[..., :160] += torch.randn_like(y[..., :160]) * 0.15
+    return y
 
 
 def main():
@@ -68,6 +66,7 @@ def main():
     torch.set_num_threads(max(1, os.cpu_count() or 2))
 
     mel, par, f0 = load(a.data)
+    mel = feats.feat(mel)
     n = len(mel)
     rng = np.random.default_rng(0)
     idx = rng.permutation(n)

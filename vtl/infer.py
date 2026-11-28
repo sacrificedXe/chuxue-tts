@@ -12,6 +12,7 @@ import numpy as np
 import soundfile as sf
 from scipy.signal import resample_poly
 
+import feats
 import make_data as MD
 import vtl_lib as V
 import torch
@@ -20,9 +21,8 @@ from train import Net
 
 
 def norm_mel(m):
-    """逐帧标准化（与 make_data.make_mel 一致）。"""
-    m = np.asarray(m, dtype=np.float32)
-    return np.clip((m - m.mean(-1, keepdims=True)) / (m.std(-1, keepdims=True) + 1e-6), -6, 6)
+    """统一走 feats.feat，训练/推理同一个函数。"""
+    return feats.feat(m)
 
 
 def read_audio(path, max_sec=None):

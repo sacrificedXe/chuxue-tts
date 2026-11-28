@@ -54,10 +54,9 @@ def make_mel(audio, sr=V.SR):
     mel = S @ _BANK['fb'].T                                # (n, 80)
     mel = mel[:T * V.MODEL_HOP].reshape(T, V.MODEL_HOP, N_MELS).mean(1)   # (T, 80)
     mel = np.log(mel + 1e-6)
-    # 逐帧标准化：同步去掉音量与频谱对比度。真人录音与 VTL 合成在这两项上差 3 倍，
-    # 不归一化时网络会把真实频谱当成分布外输入，直接塌成常数输出。
-    mel = (mel - mel.mean(-1, keepdims=True)) / (mel.std(-1, keepdims=True) + 1e-6)
-    return np.clip(mel, -6, 6)
+    # 存原始对数 mel（不做归一化）。归一化在 feats.py 里统一做，
+    # 这样以后换特征不需要重新造 8000 条数据。
+    return mel
 
 
 _G = {}
@@ -69,7 +68,7 @@ def _init():
 
 def gen_one(seed):
     rng = np.random.default_rng(seed)
-    T = 12
+    T = 24
     u0 = rng.uniform(0.12, 0.88, 4)
     u1 = np.clip(u0 + rng.normal(0, 0.22, 4), 0.08, 0.92)
     t = np.linspace(0, 1, T)[:, None]
@@ -81,6 +80,22 @@ def gen_one(seed):
     f0 += rng.normal(0, 1.5, T)
     audio = _G['vtl'].synth(V.from_unit(u), f0)
     if np.abs(audio).max() < 1e-4:
+        return None
+    # —— 信号闸门：不持续 / 音高不符 的样本直接丢弃 ——
+    blk = V.BLOCK
+    n = len(audio) // blk
+    r = np.array([np.sqrt((audio[i * blk:(i + 1) * blk] ** 2).mean()) for i in range(n)])
+    head = np.mean(r[: max(3, n // 10)])
+    tail = np.mean(r[-max(3, n // 10):])
+    if head < 1e-4 or tail / max(head, 1e-9) < 0.5:
+        return None
+    seg = audio[len(audio) // 3: len(audio) // 3 + 4096]
+    c = np.correlate(seg, seg, 'full')[len(seg) - 1:]
+    c = c / (c[0] + 1e-12)
+    lo, hi = int(V.SR / 450), int(V.SR / 70)
+    k = int(np.argmax(c[lo:hi])) + lo
+    f0_meas = V.SR / k
+    if abs(f0_meas - np.mean(f0)) / np.mean(f0) > 0.10:
         return None
     mel = make_mel(audio)
     return mel.astype(np.float16), u.astype(np.float16), f0.astype(np.float32)
@@ -111,7 +126,7 @@ def main():
     if buf:
         _save(buf, a.out, shard); shard += 1
     meta = dict(n=total, shards=shard, seconds=time.time() - t0,
-                frames_per_sample=12, model_hop=V.MODEL_HOP, sr=V.SR, free=V.FREE)
+                frames_per_sample=24, model_hop=V.MODEL_HOP, sr=V.SR, free=V.FREE)
     json.dump(meta, open(os.path.join(a.out, 'meta.json'), 'w'), indent=1)
     print('done', meta)
 
